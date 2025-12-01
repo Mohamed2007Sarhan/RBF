@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RBF & Mempool Ancestry Visualizer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Creative Background -->
+    <div class="bg-animation"></div>
+
+    <div class="lang-switch">
+        <button class="lang-btn active" onclick="setLang('en')">EN 🇺🇸</button>
+        <button class="lang-btn" onclick="setLang('ar')">AR 🇸🇦</button>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1 data-i18n="title">RBF & Mempool Ancestry Visualizer</h1>
+            <div id="connection-status" class="status-indicator disconnected" data-i18n="disconnected">Disconnected
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- Left Column: Controls -->
+            <div class="panel controls">
+                <h2 data-i18n="node_connection">1. Node Connection</h2>
+                <div class="form-group">
+                    <input type="text" id="rpc_user" placeholder="RPC User" value="user">
+                    <input type="password" id="rpc_pass" placeholder="RPC Password" value="password">
+                    <input type="text" id="rpc_host" placeholder="Host" value="127.0.0.1">
+                    <input type="number" id="rpc_port" placeholder="Port" value="18332">
+                    <button onclick="connectNode()" data-i18n="btn_connect">Connect to Node</button>
+                </div>
+
+                <h2 data-i18n="wallet_setup">2. Wallet Setup</h2>
+                <p style="font-size: 0.8rem; color: #aaa; margin-bottom: 10px;" data-i18n="wallet_desc">
+                    Provide a UTXO to start the chain. This will be the input for the Parent Transaction.
+                </p>
+                <div class="form-group">
+                    <input type="password" id="priv_key" placeholder="Private Key (WIF)">
+                    <input type="text" id="utxo_txid" placeholder="UTXO TXID">
+                    <input type="number" id="utxo_vout" placeholder="VOUT" value="0">
+                    <input type="number" id="amount" placeholder="Amount (BTC)" value="0.001">
+                    <input type="text" id="change_addr" placeholder="Change Address (Wallet B)">
+                    <input type="text" id="target_addr" placeholder="Target Address (Wallet C)">
+                </div>
+
+                <h2 data-i18n="actions">3. Experiment Actions</h2>
+                <!-- V3 Toggle -->
+                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="use_v3" style="width: auto;">
+                    <label for="use_v3" style="font-size: 0.9rem; cursor: pointer;" data-i18n="v3_label">Enable V3
+                        Transactions (TRUC)</label>
+                </div>
+
+                <div class="actions" style="display: flex; flex-direction: column; gap: 10px;">
+                    <button id="btn-step1" onclick="createParent()" disabled data-i18n="btn_step1">
+                        Step 1: Create Parent (Low Fee)
+                    </button>
+                    <button id="btn-step2" onclick="createChild()" disabled data-i18n="btn_step2">
+                        Step 2: Create Child (High Fee)
+                    </button>
+                    <button id="btn-step3" onclick="broadcastChain()" disabled data-i18n="btn_step3">
+                        Step 3: Broadcast Chain
+                    </button>
+                    <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); width: 100%; margin: 10px 0;">
+                    <button id="btn-kill" class="danger" onclick="cancelParent()" disabled data-i18n="btn_stop_all">
+                        🛑 STOP ALL (Emergency Return)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Column: Visualization & Logs -->
+            <div class="panel display">
+                <h2 data-i18n="visualization">Chain Visualization</h2>
+
+                <!-- Flowchart -->
+                <div class="visualizer">
+                    <div class="flow-row">
+                        <div id="node-parent" class="node">
+                            <strong data-i18n="node_parent">Parent TX</strong><br>
+                            <span class="fee-badge">1 sat/vB</span>
+                        </div>
+                        <div class="arrow">⬇️</div>
+                        <div id="node-child" class="node">
+                            <strong data-i18n="node_child">Child TX</strong><br>
+                            <span class="fee-badge">10 sat/vB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wallet C Status -->
+                <div class="status-box">
+                    <div style="font-size: 0.9rem; opacity: 0.8;" data-i18n="wallet_c_status">Wallet C Status (Target)
+                    </div>
+                    <div id="wallet-c-status" class="status-value waiting" data-i18n="status_waiting">Waiting...</div>
+                </div>
+
+                <h2 data-i18n="logs" style="margin-top: 20px;">System Logs</h2>
+                <div id="console" class="console">
+                    <div class="log-entry" data-i18n="log_ready">System Ready... Waiting for connection.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- How it Works Section -->
+        <div class="panel how-it-works" style="margin-top: 30px;">
+            <h2 data-i18n="how_it_works_title">How it Works: The RBF Attack</h2>
+            <div class="steps-grid">
+                <div class="step-card">
+                    <div class="step-icon">1️⃣</div>
+                    <h3 data-i18n="step1_title">The Bait</h3>
+                    <p data-i18n="step1_desc">You create a Parent Transaction with a minimal fee (1 sat/vB). It sits in
+                        the mempool, unconfirmed.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon">2️⃣</div>
+                    <h3 data-i18n="step2_title">The Hook</h3>
+                    <p data-i18n="step2_desc">You create a Child Transaction spending the Parent's output. The receiver
+                        sees "Incoming Funds".</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon">3️⃣</div>
+                    <h3 data-i18n="step3_title">The Switch</h3>
+                    <p data-i18n="step3_desc">You broadcast a Replacement Transaction spending the SAME input but with a
+                        higher fee.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon">4️⃣</div>
+                    <h3 data-i18n="step4_title">The Eviction</h3>
+                    <p data-i18n="step4_desc">Miners accept the higher fee tx. The original Parent is removed. The Child
+                        becomes invalid (Orphaned).</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+
+        // Translations
+        const i18n = {
+            en: {
+                title: "RBF & Mempool Ancestry Visualizer",
+                disconnected: "Disconnected",
+                connected: "Connected",
+                node_connection: "1. Node Connection",
+                btn_connect: "Connect to Node",
+                wallet_setup: "2. Wallet Setup",
+                wallet_desc: "Provide a UTXO to start the chain. This will be the input for the Parent Transaction.",
+                actions: "3. Experiment Actions",
+                v3_label: "Enable V3 Transactions (TRUC)",
+                btn_step1: "Step 1: Create Parent (Low Fee)",
+                btn_step2: "Step 2: Create Child (High Fee)",
+                btn_step3: "Step 3: Broadcast Chain",
+                btn_stop_all: "🛑 STOP ALL (Emergency Return)",
+                visualization: "Chain Visualization",
+                node_parent: "Parent TX",
+                node_child: "Child TX",
+                wallet_c_status: "Wallet C Status (Target)",
+                status_waiting: "Waiting...",
+                status_pending: "⚠️ Pending (Incoming)",
+                status_blocked: "⛔ BLOCKED (Orphaned)",
+                status_received: "✅ Received",
+                logs: "System Logs",
+                log_ready: "System Ready... Waiting for connection.",
+                alert_rbf: "⚠️ WARNING: This will perform a Double Spend attack on your own transaction. Are you sure?",
+                how_it_works_title: "How it Works: The RBF Attack",
+                step1_title: "The Bait",
+                step1_desc: "You create a Parent Transaction with a minimal fee (1 sat/vB). It sits in the mempool, unconfirmed.",
+                step2_title: "The Hook",
+                step2_desc: "You create a Child Transaction spending the Parent's output. The receiver sees 'Incoming Funds'.",
+                step3_title: "The Switch",
+                step3_desc: "You broadcast a Replacement Transaction spending the SAME input but with a higher fee.",
+                step4_title: "The Eviction",
+                step4_desc: "Miners accept the higher fee tx. The original Parent is removed. The Child becomes invalid (Orphaned)."
+            },
+            ar: {
+                title: "أداة تصور RBF وسلسلة المعاملات",
+                disconnected: "غير متصل",
+                connected: "متصل",
+                node_connection: "1. الاتصال بالعقدة (Node)",
+                btn_connect: "اتصال",
+                wallet_setup: "2. إعداد المحفظة",
+                wallet_desc: "أدخل بيانات UTXO لبدء السلسلة. سيتم استخدامها كمدخل للمعاملة الأب.",
+                actions: "3. إجراءات التجربة",
+                v3_label: "تفعيل معاملات V3 (TRUC)",
+                btn_step1: "خطوة 1: إنشاء المعاملة الأب (رسوم منخفضة)",
+                btn_step2: "خطوة 2: إنشاء المعاملة الابن (رسوم مرتفعة)",
+                btn_step3: "خطوة 3: بث السلسلة للشبكة",
+                btn_stop_all: "🛑 إيقاف الكل (استرجاع طوارئ)",
+                visualization: "تصور السلسلة (Flowchart)",
+                node_parent: "المعاملة الأب",
+                node_child: "المعاملة الابن",
+                wallet_c_status: "حالة المحفظة C (المستلم)",
+                status_waiting: "في الانتظار...",
+                status_pending: "⚠️ قيد الانتظار (وارد)",
+                status_blocked: "⛔ محجوب (تم الإلغاء)",
+                status_received: "✅ تم الاستلام",
+                logs: "سجلات النظام",
+                log_ready: "النظام جاهز... بانتظار الاتصال.",
+                alert_rbf: "⚠️ تحذير: سيقوم هذا الإجراء بهجوم الإنفاق المزدوج (Double Spend) على معاملتك. هل أنت متأكد؟",
+                how_it_works_title: "كيف يعمل الهجوم (RBF)",
+                step1_title: "الطعم",
+                step1_desc: "تقوم بإنشاء معاملة 'أب' برسوم ضئيلة جداً. تبقى في الذاكرة (Mempool) غير مؤكدة.",
+                step2_title: "الخطاف",
+                step2_desc: "تقوم بإنشاء معاملة 'ابن' تعتمد على الأب. يرى المستلم 'أموال قادمة'.",
+                step3_title: "التبديل",
+                step3_desc: "تقوم ببث معاملة بديلة تنفق نفس المدخلات ولكن برسوم أعلى بكثير.",
+                step4_title: "الطرد",
+                step4_desc: "يقبل المعدنون المعاملة الأعلى رسوماً. يتم حذف الأب الأصلي، وتصبح معاملة الابن غير صالحة (يتيمة)."
+            }
+        };
+
+        let currentLang = 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.body.className = lang === 'ar' ? 'rtl' : '';
+            document.documentElement.lang = lang;
+
+            // Update buttons
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.lang-btn[onclick="setLang('${lang}')"]`).classList.add('active');
+
+            // Update Text
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang][key]) {
+                    el.innerText = i18n[lang][key];
+                }
+            });
+
+            // Update Placeholders
+            if (lang === 'ar') {
+                document.getElementById('rpc_user').placeholder = "اسم المستخدم";
+                document.getElementById('rpc_pass').placeholder = "كلمة المرور";
+                document.getElementById('priv_key').placeholder = "المفتاح الخاص (WIF)";
+                document.getElementById('change_addr').placeholder = "عنوان الاسترجاع (محفظة B)";
+                document.getElementById('target_addr').placeholder = "عنوان الهدف (محفظة C)";
+            } else {
+                document.getElementById('rpc_user').placeholder = "RPC User";
+                document.getElementById('rpc_pass').placeholder = "RPC Password";
+                document.getElementById('priv_key').placeholder = "Private Key (WIF)";
+                document.getElementById('change_addr').placeholder = "Change Address (Wallet B)";
+                document.getElementById('target_addr').placeholder = "Target Address (Wallet C)";
+            }
+        }
+
+        function log(msg) {
+            const consoleDiv = document.getElementById('console');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerText = msg;
+            consoleDiv.appendChild(entry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        // Poll for Status
+        setInterval(async () => {
+            if (document.getElementById('connection-status').classList.contains('connected')) {
+                try {
+                    const res = await fetch(`${API}/check_status`);
+                    const data = await res.json();
+                    if (data.success) {
+                        updateStatusUI(data.status);
+                    }
+                } catch (e) { }
+            }
+        }, 2000);
+
+        function updateStatusUI(status) {
+            const statusDiv = document.getElementById('wallet-c-status');
+            const key = status.wallet_c.includes("Pending") ? "status_pending" :
+                status.wallet_c.includes("BLOCKED") ? "status_blocked" :
+                    status.wallet_c.includes("Received") ? "status_received" : "status_waiting";
+
+            statusDiv.innerText = i18n[currentLang][key];
+            statusDiv.className = `status-value ${key.replace('status_', '')}`;
+        }
+
+        async function connectNode() {
+            const user = document.getElementById('rpc_user').value;
+            const pass = document.getElementById('rpc_pass').value;
+            const host = document.getElementById('rpc_host').value;
+            const port = document.getElementById('rpc_port').value;
+
+            const res = await fetch(`${API}/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user, password: pass, host, port })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('connection-status').className = 'status-indicator connected';
+                document.getElementById('connection-status').innerText = i18n[currentLang].connected;
+                document.getElementById('btn-step1').disabled = false;
+                document.getElementById('console').innerHTML = '';
+                data.logs.forEach(l => log(l));
+            } else {
+                log("❌ Connection Failed: " + (data.error || "Unknown error"));
+            }
+        }
+
+        async function createParent() {
+            const body = {
+                utxo_txid: document.getElementById('utxo_txid').value,
+                utxo_vout: document.getElementById('utxo_vout').value,
+                amount: document.getElementById('amount').value,
+                change_addr: document.getElementById('change_addr').value,
+                priv_key: document.getElementById('priv_key').value,
+                use_v3: document.getElementById('use_v3').checked
+            };
+
+            const res = await fetch(`${API}/create_parent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('node-parent').classList.add('active');
+                document.getElementById('btn-step2').disabled = false;
+                document.getElementById('console').innerHTML = '';
+                data.logs.forEach(l => log(l));
+            } else {
+                log("❌ Error: " + data.error);
+            }
+        }
+
+        async function createChild() {
+            const body = {
+                target_addr: document.getElementById('target_addr').value,
+                priv_key: document.getElementById('priv_key').value,
+                use_v3: document.getElementById('use_v3').checked
+            };
+
+            const res = await fetch(`${API}/create_child`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('node-child').classList.add('active');
+                document.getElementById('btn-step3').disabled = false;
+                document.getElementById('console').innerHTML = '';
+                data.logs.forEach(l => log(l));
+            } else {
+                log("❌ Error: " + data.error);
+            }
+        }
+
+        async function broadcastChain() {
+            const res = await fetch(`${API}/broadcast`, { method: 'POST' });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('node-parent').classList.add('broadcasted');
+                document.getElementById('node-child').classList.add('broadcasted');
+                document.getElementById('btn-kill').disabled = false;
+                document.getElementById('console').innerHTML = '';
+                data.logs.forEach(l => log(l));
+            } else {
+                log("❌ Broadcast Error: " + data.error);
+            }
+        }
+
+        async function cancelParent() {
+            if (!confirm(i18n[currentLang].alert_rbf)) return;
+
+            const body = {
+                utxo_txid: document.getElementById('utxo_txid').value,
+                utxo_vout: document.getElementById('utxo_vout').value,
+                my_addr: document.getElementById('change_addr').value,
+                priv_key: document.getElementById('priv_key').value
+            };
+
+            const res = await fetch(`${API}/cancel`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('node-parent').classList.add('cancelled');
+                document.getElementById('node-child').classList.add('cancelled');
+                document.getElementById('console').innerHTML = '';
+                data.logs.forEach(l => log(l));
+            } else {
+                log("❌ RBF Error: " + data.error);
+            }
+        }
+    </script>
+</body>
+
+</html>
