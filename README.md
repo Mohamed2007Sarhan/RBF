@@ -2,7 +2,6 @@
 
 A powerful, educational tool designed to visualize and experiment with **Replace-By-Fee (RBF)**, **Mempool Ancestry**, and **Double Spend** dynamics on the Bitcoin Testnet.
 
-![RBF Visualizer Interface](https://via.placeholder.com/800x400?text=RBF+Visualizer+Interface)
 
 ## 🚀 Features
 
@@ -23,7 +22,7 @@ A powerful, educational tool designed to visualize and experiment with **Replace
 
 1.  **Clone the Repository**
     ```bash
-    git clone https://github.com/yourusername/rbf-visualizer.git
+    git clone https://github.com/Mohamed2007Sarhan/RBF.git
     cd rbf-visualizer
     ```
 
@@ -74,3 +73,4 @@ Using this tool on Mainnet with real funds may result in **loss of funds** due t
 
 ---
 *Built with ❤️ for Bitcoin Education.*
+
