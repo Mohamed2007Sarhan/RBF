@@ -72,5 +72,5 @@ This tool is designed for **Testnet** or **Regtest** environments.
 Using this tool on Mainnet with real funds may result in **loss of funds** due to transaction fees or mistakes. The authors are not responsible for any financial loss.
 
 ---
-*Built with ❤️ for Bitcoin Education.*
+*Built with ❤️ for Mohamed Sarhan.*
 
